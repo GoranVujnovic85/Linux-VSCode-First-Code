@@ -1,65 +1,37 @@
+/* Задатак
+Модификовати пример "first commit" тако да се створе 3 нити на основу једне функције, при чему свака програмска нит има
+свој идентификатор (1, 2 i 3).
+Помоћу објеката искључивог приступа и дељених променљивих, реализовати механизам смењивања нити тако да се на екрану исписује
+123123123123123123123123123123…….
+то јест, да се прво активира нит 1, па нит 2 а затим нит 3, 100 пута. После 100 исписа, нити се завршавају.
+Механизам за смењивање нити треба да обезбеди да нит након свог исписа сигнализира наредној нити да може да испише свој
+идентификатор.
+Задатак реализовати помоћу објекта искључивог приступа и дељене променљиве. Пошто приступ дељеној променљивој представља критичну секцију нити, потребно ју је заштитити коришћењем објекта искључивог приступа. Све три програмске нити реализовати истом функцијом којој се прослеђује идентификатор програмске нити.
+Уколико се између два приступа критичној секцији уметне пауза (помоћу функције Sleep), програм ће се брже завршити. Зашто?
+*/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <semaphore.h>
+#include <unistd.h>
 
-#define MAXVALUE 3
+static pthread_mutex_t cs_mutex;
 
-static sem_t startSemaphore1;
-static sem_t startSemaphore2;
-static sem_t startSemaphore3;
 
-static pthread_t hPrint1;
-static pthread_t hPrint2;
-static pthread_t hPrint3;
-
-void* print1 (void *pParam)
+void* print (void *pParam)
 {
-    sem_wait(&startSemaphore1);
-
-    /* prikljuci se na na nit 2*/
-    pthread_join(hPrint2, NULL);
-
-    for (int i = 0; i < MAXVALUE; i++)
+    int c = *(char*)pParam;
+   
+    for (int i = 0 ; i < 100 ; i++)
     {
-        printf("Podesavanje");
-        printf(" GIT-a");
-        printf(" i");
-        printf(" VSCoda\n");    
-    }
+        pthread_mutex_lock(&cs_mutex);
+        
+        printf("%c", c);  
+        fflush(stdout);
 
-    return 0;
-}
+        pthread_mutex_unlock(&cs_mutex);
 
-void* print2 (void *lpParam)
-{
-    sem_wait(&startSemaphore2);
-
-    /* prikljuci se na na nit 3*/
-    pthread_join(hPrint3, NULL);
-
-    for (int i = 0; i < MAXVALUE; i++)
-    {
-        printf("Pozdrav");
-        printf(" iz");
-        printf(" Linux-a\n");   
-    }
-
-    return 0;
-}
-
-void* print3 (void *lpParam)
-{
-    sem_wait(&startSemaphore3);
-
-    for(int i = 0; i < MAXVALUE; i++)
-    {
-        printf("Danas");
-        printf(" je");
-        printf(" petak");
-        printf(" moj");
-        printf(" omiljeni");
-        printf(" dan \n");    
+        sleep(1);
     }
 
     return 0;
@@ -67,28 +39,26 @@ void* print3 (void *lpParam)
 
 int main (void)
 {
-    sem_init(&startSemaphore1, 0, 0);
-    sem_init(&startSemaphore2, 0, 0);
-    sem_init(&startSemaphore3, 0, 0);
+    pthread_t hPrint1;
+    pthread_t hPrint2;
+    pthread_t hPrint3;
 
-    pthread_create(&hPrint1, NULL, print1, 0);
-    pthread_create(&hPrint2, NULL, print2, 0);
-    pthread_create(&hPrint3, NULL, print3, 0);
+    /* Argumenti niti. */
+    char c1 = '1';
+    char c2 = '2';
+    char c3 = '3';
 
-    /* Signaliziranje nitima da mogu da pocnu sa radom.
-    Ovim se osigurava da ni jedna nit ne dodje do funkcije pthread_join
-    a da nit koju zeli da prikljuci nije pokrenuta */
+    pthread_mutex_init(&cs_mutex, NULL);
 
-    sem_post(&startSemaphore1);
-    sem_post(&startSemaphore2);
-    sem_post(&startSemaphore3);
+    pthread_create(&hPrint1, NULL, print, (void*)&c1);
+    pthread_create(&hPrint2, NULL, print, (void*)&c2);
+    pthread_create(&hPrint3, NULL, print, (void*)&c3);
 
-    /* Prikljuci se na nit 1 */
     pthread_join(hPrint1, NULL);
+    pthread_join(hPrint2, NULL);
+    pthread_join(hPrint3, NULL);
 
-    sem_destroy(&startSemaphore1);
-    sem_destroy(&startSemaphore2);
-    sem_destroy(&startSemaphore3);
+    pthread_mutex_destroy(&cs_mutex);
 
     return 0;
 }
